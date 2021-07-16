@@ -1,0 +1,27 @@
+python
+from google.cloud import bigquery
+import json
+import boto3
+import os
+s3 = boto3.resource('s3')
+client = bigquery.Client.from_service_account_json(
+    './bqfile.json')
+datasets = list(client.list_datasets())
+project = client.project
+table = os.environ['table']
+PATH_TO = os.environ['path_to']
+BUCKET_NAME = os.environ['bucket']
+QUERY = (
+    'SELECT '
+    ' TO_JSON_STRING(g) jsonfield '
+    ' FROM ` bigquery-public-data:google_analytics_sample..ga_sessions_'+table+'` g '
+)
+query_job = client.query(QUERY)  # API request
+
+def lambda_handler(event, context):
+    tofile=''
+    rows = query_job.result()
+    for row in rows:
+        newfield=row.jsonfield+'\n'
+        tofile += newfield
+    s3.Object(BUCKET_NAME, PATH_TO+'/ga_sessions_' + table+'/ga_sessions_'+table+'.json').put(Body=tofile)
